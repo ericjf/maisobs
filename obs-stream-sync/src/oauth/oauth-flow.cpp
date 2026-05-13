@@ -69,7 +69,7 @@ void OAuthFlow::start(const Config &config, DoneCallback cb)
 	QUrl url(config.auth_url);
 	QUrlQuery q;
 	q.addQueryItem("client_id", config.client_id);
-	q.addQueryItem("redirect_uri", redirect_uri);
+	q.addQueryItem("redirect_uri", redirect_uri_);
 	q.addQueryItem("response_type", "code");
 	q.addQueryItem("scope", config.scopes.join(" "));
 	q.addQueryItem("state", state_);
