@@ -8,6 +8,7 @@
 #include <vector>
 #include <mutex>
 #include <functional>
+#include <chrono>
 
 struct RuntimeOutput {
 	DestinationConfig config;
@@ -18,7 +19,13 @@ struct RuntimeOutput {
 	obs_output_t *output = nullptr;
 	obs_service_t *service = nullptr;
 	bool active = false;
+	bool user_stopped = false; /* set when user explicitly stops — suppress reconnect */
 	std::string last_error;
+
+	/* reconnect state */
+	int reconnect_attempts = 0;
+	static constexpr int MAX_RECONNECT = 5;
+	static constexpr int BASE_DELAY_MS = 1000;
 };
 
 class MultistreamManager {

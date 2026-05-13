@@ -5,6 +5,84 @@
 #include <util/platform.h>
 
 #include <filesystem>
+#include <vector>
+
+/* ── DPAPI stream-key encryption (Windows only) ──────────────────────── */
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <wincrypt.h>
+#pragma comment(lib, "crypt32.lib")
+
+static std::string dpapi_encrypt(const std::string &plain)
+{
+	if (plain.empty())
+		return {};
+	DATA_BLOB in_blob{(DWORD)plain.size(), (BYTE *)plain.c_str()};
+	DATA_BLOB out_blob{};
+	if (!CryptProtectData(&in_blob, L"obs-scene-multistream", nullptr, nullptr, nullptr,
+			      0, &out_blob)) {
+		obs_log(LOG_WARNING, "[scene-multistream] DPAPI encrypt failed (0x%lx) — storing plain",
+			(unsigned long)GetLastError());
+		return plain;
+	}
+	/* encode to base64 for JSON storage */
+	DWORD b64_len = 0;
+	CryptBinaryToStringA(out_blob.pbData, out_blob.cbData, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+			     nullptr, &b64_len);
+	std::string b64(b64_len, '\0');
+	CryptBinaryToStringA(out_blob.pbData, out_blob.cbData, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+			     b64.data(), &b64_len);
+	/* b64_len includes null terminator — trim it */
+	if (!b64.empty() && b64.back() == '\0')
+		b64.pop_back();
+	LocalFree(out_blob.pbData);
+	return b64;
+}
+
+static std::string dpapi_decrypt(const std::string &b64)
+{
+	if (b64.empty())
+		return {};
+	DWORD bin_len = 0;
+	if (!CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(), CRYPT_STRING_BASE64, nullptr, &bin_len,
+				  nullptr, nullptr)) {
+		/* not base64 — probably plain text from old version, return as-is */
+		return b64;
+	}
+	std::vector<BYTE> bin(bin_len);
+	CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(), CRYPT_STRING_BASE64, bin.data(), &bin_len,
+			     nullptr, nullptr);
+	DATA_BLOB in_blob{bin_len, bin.data()};
+	DATA_BLOB out_blob{};
+	if (!CryptProtectData(&in_blob, nullptr, nullptr, nullptr, nullptr, 0,
+			      &out_blob)) {
+		obs_log(LOG_WARNING, "[scene-multistream] DPAPI decrypt failed (0x%lx) — returning raw",
+			(unsigned long)GetLastError());
+		return b64;
+	}
+	std::string plain((char *)out_blob.pbData, out_blob.cbData);
+	LocalFree(out_blob.pbData);
+	return plain;
+}
+#else
+/* macOS / Linux: no encryption yet — store plain, warn on first use */
+static bool warned_plain = false;
+static std::string dpapi_encrypt(const std::string &plain)
+{
+	if (!warned_plain) {
+		obs_log(LOG_WARNING,
+			"[scene-multistream] stream key encryption not supported on this platform — stored plain");
+		warned_plain = true;
+	}
+	return plain;
+}
+static std::string dpapi_decrypt(const std::string &stored)
+{
+	return stored;
+}
+#endif
+/* ─────────────────────────────────────────────────────────────────────── */
 
 namespace scenemulti {
 
@@ -22,7 +100,7 @@ static DestinationConfig from_obs_data(obs_data_t *d)
 	c.name = obs_data_get_string(d, "name");
 	c.scene_name = obs_data_get_string(d, "scene_name");
 	c.rtmp_url = obs_data_get_string(d, "rtmp_url");
-	c.stream_key = obs_data_get_string(d, "stream_key");
+	c.stream_key = dpapi_decrypt(obs_data_get_string(d, "stream_key"));
 	const char *venc = obs_data_get_string(d, "video_encoder");
 	if (venc && *venc)
 		c.video_encoder = venc;
@@ -54,7 +132,7 @@ static obs_data_t *to_obs_data(const DestinationConfig &c)
 	obs_data_set_string(d, "name", c.name.c_str());
 	obs_data_set_string(d, "scene_name", c.scene_name.c_str());
 	obs_data_set_string(d, "rtmp_url", c.rtmp_url.c_str());
-	obs_data_set_string(d, "stream_key", c.stream_key.c_str());
+	obs_data_set_string(d, "stream_key", dpapi_encrypt(c.stream_key).c_str());
 	obs_data_set_string(d, "video_encoder", c.video_encoder.c_str());
 	obs_data_set_string(d, "audio_encoder", c.audio_encoder.c_str());
 	obs_data_set_int(d, "width", c.width);

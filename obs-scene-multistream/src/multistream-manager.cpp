@@ -5,6 +5,8 @@
 #include <obs-module.h>
 
 #include <utility>
+#include <thread>
+#include <chrono>
 
 MultistreamManager &MultistreamManager::instance()
 {
@@ -163,6 +165,7 @@ bool MultistreamManager::stop(const std::string &name)
 		return false;
 
 	RuntimeOutput &rt = it->second;
+	rt.user_stopped = true; /* suppress reconnect */
 	if (rt.output && obs_output_active(rt.output)) {
 		obs_output_stop(rt.output);
 	}
@@ -260,21 +263,73 @@ void MultistreamManager::on_output_stop(void *data, calldata_t *cd)
 		dest_name = dest_name.substr(prefix.size());
 
 	std::string err;
+	bool should_reconnect = false;
+	int attempt = 0;
+	int delay_ms = 0;
+	DestinationConfig reconnect_cfg;
+
 	if (code != OBS_OUTPUT_SUCCESS) {
 		const char *last = obs_output_get_last_error(out);
-		err = last ? last : ("output stopped with code " + std::to_string(code));
+		err = last ? last : ("stopped with code " + std::to_string(code));
+	}
+
+	{
+		std::lock_guard<std::mutex> lock(self->mtx_);
+		auto it = self->outputs_.find(dest_name);
+		if (it != self->outputs_.end()) {
+			RuntimeOutput &rt = it->second;
+			rt.active = false;
+			rt.last_error = err;
+
+			if (code != OBS_OUTPUT_SUCCESS && !rt.user_stopped &&
+			    rt.reconnect_attempts < RuntimeOutput::MAX_RECONNECT) {
+				should_reconnect = true;
+				attempt = ++rt.reconnect_attempts;
+				/* exponential backoff: 1s, 2s, 4s, 8s, 16s */
+				delay_ms = RuntimeOutput::BASE_DELAY_MS * (1 << (attempt - 1));
+				reconnect_cfg = rt.config;
+				err = "reconnecting (" + std::to_string(attempt) + "/" +
+				      std::to_string(RuntimeOutput::MAX_RECONNECT) + "): " + err;
+			}
+		}
 	}
 
 	StatusCallback cb;
 	{
 		std::lock_guard<std::mutex> lock(self->mtx_);
-		auto it = self->outputs_.find(dest_name);
-		if (it != self->outputs_.end()) {
-			it->second.active = false;
-			it->second.last_error = err;
-		}
 		cb = self->status_cb_;
 	}
 	if (cb)
 		cb(dest_name, false, err);
+
+	if (should_reconnect) {
+		obs_log(LOG_INFO, "[scene-multistream] '%s' reconnect attempt %d/%d in %dms",
+			dest_name.c_str(), attempt, RuntimeOutput::MAX_RECONNECT, delay_ms);
+		/* Reconnect on a background thread after delay.
+		   MultistreamManager lifetime >= OBS session, safe to capture self. */
+		std::thread([self, reconnect_cfg, dest_name, delay_ms, attempt]() {
+			std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+			std::string err2;
+			/* Only reconnect if not user-stopped in the meantime */
+			bool still_pending = false;
+			{
+				std::lock_guard<std::mutex> lock(self->mtx_);
+				auto it = self->outputs_.find(dest_name);
+				if (it != self->outputs_.end() && !it->second.user_stopped &&
+				    it->second.reconnect_attempts == attempt)
+					still_pending = true;
+			}
+			if (!still_pending)
+				return;
+			/* tear down existing (dead) runtime before rebuilding */
+			{
+				std::lock_guard<std::mutex> lock(self->mtx_);
+				auto it = self->outputs_.find(dest_name);
+				if (it != self->outputs_.end())
+					self->cleanup_runtime(it->second);
+				self->outputs_.erase(dest_name);
+			}
+			self->start(reconnect_cfg, err2);
+		}).detach();
+	}
 }

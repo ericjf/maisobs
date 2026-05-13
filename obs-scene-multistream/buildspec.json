@@ -38,7 +38,7 @@
     },
     "name": "obs-scene-multistream",
     "displayName": "Scene Multistream",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "author": "Eric Teixeira",
     "website": "https://github.com/ericjf/obs-scene-multistream",
     "email": "ericjfteixeira@gmail.com"
