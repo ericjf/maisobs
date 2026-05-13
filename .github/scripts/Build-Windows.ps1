@@ -35,7 +35,9 @@ function Build {
     }
 
     $ScriptHome = $PSScriptRoot
-    $ProjectRoot = Resolve-Path -Path "$PSScriptRoot/../.."
+    $BaseRoot = Resolve-Path -Path "$PSScriptRoot/../.."
+    $PluginDir = $env:PLUGIN_DIR
+    $ProjectRoot = if ($PluginDir) { Join-Path $BaseRoot $PluginDir } else { $BaseRoot }
 
     $UtilityFunctions = Get-ChildItem -Path $PSScriptRoot/utils.pwsh/*.ps1 -Recurse
 

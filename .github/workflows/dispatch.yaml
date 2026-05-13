@@ -15,4 +15,6 @@ jobs:
   check-and-build:
     if: inputs.job == 'build'
     uses: ./.github/workflows/build-project.yaml
+    with:
+      pluginDir: obs-scene-multistream
     secrets: inherit

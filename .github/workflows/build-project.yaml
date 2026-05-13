@@ -1,6 +1,12 @@
 name: Build Project
 on:
   workflow_call:
+    inputs:
+      pluginDir:
+        description: Plugin subdirectory (e.g. obs-scene-multistream)
+        required: false
+        type: string
+        default: ''
     outputs:
       pluginName:
         description: Project name detected by parsing build spec file
@@ -62,8 +68,11 @@ jobs:
           done
           echo "commitHash=${GITHUB_SHA:0:9}" >> $GITHUB_OUTPUT
 
-          plugin_name="$(grep 'name' buildspec.json | sed -E -e 's/^.+"name":[^"]+"(.+)",?$/\1/g')"
-          plugin_display_name="$(grep 'displayName' buildspec.json | sed -E -e 's/^.+"displayName":[^"]+"(.+)",?$/\1/g' || echo "")"
+          plugin_dir="${{ inputs.pluginDir }}"
+          buildspec_path="${plugin_dir:+${plugin_dir}/}buildspec.json"
+
+          plugin_name="$(grep 'name' ${buildspec_path} | sed -E -e 's/^.+"name":[^"]+"(.+)",?$/\1/g')"
+          plugin_display_name="$(grep 'displayName' ${buildspec_path} | sed -E -e 's/^.+"displayName":[^"]+"(.+)",?$/\1/g' || echo "")"
 
           if [[ "${plugin_display_name}" ]]; then
             echo "pluginName=${plugin_display_name}" >> $GITHUB_OUTPUT
@@ -86,6 +95,8 @@ jobs:
 
       - name: Set Up Environment 🔧
         id: setup
+        env:
+          PLUGIN_DIR: ${{ inputs.pluginDir }}
         run: |
           : Set Up Environment 🔧
           if (( ${+RUNNER_DEBUG} )) setopt XTRACE
@@ -104,10 +115,11 @@ jobs:
           if (( #remove_formulas )) brew uninstall --ignore-dependencies ${remove_formulas}
           print '::endgroup::'
 
+          local buildspec_path="${PLUGIN_DIR:+${PLUGIN_DIR}/}buildspec.json"
           local product_name
           local product_version
           read -r product_name product_version <<< \
-            "$(jq -r '. | {name, version} | join(" ")' buildspec.json)"
+            "$(jq -r '. | {name, version} | join(" ")' ${buildspec_path})"
 
           print "pluginName=${product_name}" >> $GITHUB_OUTPUT
           print "pluginVersion=${product_version}" >> $GITHUB_OUTPUT
@@ -141,6 +153,7 @@ jobs:
           config: ${{ needs.check-event.outputs.config }}
           codesign: ${{ fromJSON(needs.check-event.outputs.codesign) }}
           codesignIdent: ${{ steps.codesign.outputs.codesignIdent }}
+          pluginDir: ${{ inputs.pluginDir }}
 
       - name: Package Plugin 📀
         uses: ./.github/actions/package-plugin
@@ -155,19 +168,20 @@ jobs:
           notarize: ${{ fromJSON(needs.check-event.outputs.notarize) && fromJSON(steps.codesign.outputs.haveNotarizationUser) }}
           codesignUser: ${{ secrets.MACOS_NOTARIZATION_USERNAME }}
           codesignPass: ${{ secrets.MACOS_NOTARIZATION_PASSWORD }}
+          pluginDir: ${{ inputs.pluginDir }}
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal.*
+          path: ${{ github.workspace }}/${{ inputs.pluginDir && format('{0}/', inputs.pluginDir) }}release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal.*
 
       - name: Upload Debug Symbol Artifacts 🪲
         uses: actions/upload-artifact@v4
         if: ${{ needs.check-event.outputs.config == 'Release' }}
         with:
           name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}-dSYMs
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal-dSYMs.*
+          path: ${{ github.workspace }}/${{ inputs.pluginDir && format('{0}/', inputs.pluginDir) }}release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal-dSYMs.*
 
       - uses: actions/cache/save@v4
         if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit != 'true'
@@ -197,8 +211,11 @@ jobs:
           : Set Up Environment 🔧
           if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
 
+          plugin_dir="${{ inputs.pluginDir }}"
+          buildspec_path="${plugin_dir:+${plugin_dir}/}buildspec.json"
+
           read -r product_name product_version <<< \
-            "$(jq -r '. | {name, version} | join(" ")' buildspec.json)"
+            "$(jq -r '. | {name, version} | join(" ")' ${buildspec_path})"
 
           echo "pluginName=${product_name}" >> $GITHUB_OUTPUT
           echo "pluginVersion=${product_version}" >> $GITHUB_OUTPUT
@@ -216,6 +233,7 @@ jobs:
         with:
           target: x86_64
           config: ${{ needs.check-event.outputs.config }}
+          pluginDir: ${{ inputs.pluginDir }}
 
       - name: Package Plugin 📀
         uses: ./.github/actions/package-plugin
@@ -223,25 +241,26 @@ jobs:
           target: x86_64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
+          pluginDir: ${{ inputs.pluginDir }}
 
       - name: Upload Source Tarball 🗜️
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-${{ matrix.os }}-sources-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-source.*
+          path: ${{ github.workspace }}/${{ inputs.pluginDir && format('{0}/', inputs.pluginDir) }}release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-source.*
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-x86_64*.*
+          path: ${{ github.workspace }}/${{ inputs.pluginDir && format('{0}/', inputs.pluginDir) }}release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-x86_64*.*
 
       - name: Upload debug symbol artifacts 🪲
         uses: actions/upload-artifact@v4
         if: ${{ fromJSON(needs.check-event.outputs.package) }}
         with:
           name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}-dbgsym
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-x86_64*-dbgsym.ddeb
+          path: ${{ github.workspace }}/${{ inputs.pluginDir && format('{0}/', inputs.pluginDir) }}release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-x86_64*-dbgsym.ddeb
 
       - uses: actions/cache/save@v4
         if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit != 'true'
@@ -270,7 +289,9 @@ jobs:
             Set-PSDebug -Trace 1
           }
 
-          $BuildSpec = Get-Content -Path buildspec.json -Raw | ConvertFrom-Json
+          $PluginDir = '${{ inputs.pluginDir }}'
+          $BuildSpecPath = if ($PluginDir) { "${PluginDir}/buildspec.json" } else { "buildspec.json" }
+          $BuildSpec = Get-Content -Path $BuildSpecPath -Raw | ConvertFrom-Json
           $ProductName = $BuildSpec.name
           $ProductVersion = $BuildSpec.version
 
@@ -282,6 +303,7 @@ jobs:
         with:
           target: x64
           config: ${{ needs.check-event.outputs.config }}
+          pluginDir: ${{ inputs.pluginDir }}
 
       - name: Package Plugin 📀
         uses: ./.github/actions/package-plugin
@@ -289,9 +311,10 @@ jobs:
           target: x64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
+          pluginDir: ${{ inputs.pluginDir }}
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64*.*
+          path: ${{ github.workspace }}/${{ inputs.pluginDir && format('{0}/', inputs.pluginDir) }}release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64*.*

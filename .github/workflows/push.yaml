@@ -18,9 +18,11 @@ jobs:
     permissions:
       contents: read
 
-  build-project:
-    name: Build Project 🧱
+  build-scene-multistream:
+    name: Build obs-scene-multistream 🧱
     uses: ./.github/workflows/build-project.yaml
+    with:
+      pluginDir: obs-scene-multistream
     secrets: inherit
     permissions:
       contents: read
@@ -29,7 +31,7 @@ jobs:
     name: Create Release 🛫
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
-    needs: build-project
+    needs: build-scene-multistream
     defaults:
       run:
         shell: bash
@@ -108,7 +110,7 @@ jobs:
           draft: true
           prerelease: ${{ fromJSON(steps.check.outputs.prerelease) }}
           tag_name: ${{ steps.check.outputs.version }}
-          name: ${{ needs.build-project.outputs.pluginName }} ${{ steps.check.outputs.version }}
+          name: ${{ needs.build-scene-multistream.outputs.pluginName }} ${{ steps.check.outputs.version }}
           body_path: ${{ github.workspace }}/CHECKSUMS.txt
           files: |
             ${{ github.workspace }}/*.exe

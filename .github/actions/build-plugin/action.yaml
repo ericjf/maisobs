@@ -24,6 +24,10 @@ inputs:
     description: Working directory for packaging
     required: false
     default: ${{ github.workspace }}
+  pluginDir:
+    description: Plugin subdirectory relative to repo root (e.g. obs-scene-multistream)
+    required: false
+    default: ''
 runs:
   using: composite
   steps:
@@ -35,6 +39,7 @@ runs:
         CCACHE_DIR: ${{ inputs.workingDirectory }}/.ccache
         CODESIGN_IDENT: ${{ inputs.codesignIdent }}
         CODESIGN_TEAM: ${{ inputs.codesignTeam }}
+        PLUGIN_DIR: ${{ inputs.pluginDir }}
       run: |
         : Run macOS Build
 
@@ -62,6 +67,7 @@ runs:
       working-directory: ${{ inputs.workingDirectory }}
       env:
         CCACHE_DIR: ${{ inputs.workingDirectory }}/.ccache
+        PLUGIN_DIR: ${{ inputs.pluginDir }}
       run: |
         : Run Ubuntu Build
 
@@ -76,6 +82,8 @@ runs:
     - name: Run Windows Build
       if: runner.os == 'Windows'
       shell: pwsh
+      env:
+        PLUGIN_DIR: ${{ inputs.pluginDir }}
       run: |
         # Run Windows Build
         if ( $Env:RUNNER_DEBUG -ne $null ) {

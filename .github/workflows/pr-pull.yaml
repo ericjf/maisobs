@@ -19,9 +19,11 @@ jobs:
     permissions:
       contents: read
 
-  build-project:
-    name: Build Project 🧱
+  build-scene-multistream:
+    name: Build obs-scene-multistream 🧱
     uses: ./.github/workflows/build-project.yaml
+    with:
+      pluginDir: obs-scene-multistream
     secrets: inherit
     permissions:
       contents: read
