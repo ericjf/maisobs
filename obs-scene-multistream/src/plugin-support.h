@@ -32,16 +32,6 @@ extern const char *PLUGIN_VERSION;
 
 void obs_log(int log_level, const char *format, ...);
 
-/* Forward-declare blogva matching OBS SDK linkage on each platform.
-   On Windows OBS exports blogva with __declspec(dllimport); declaring
-   it as plain extern causes MSVC C2375 when util/base.h is also in
-   scope.  Using the same decoration lets both declarations coexist. */
-#if defined(_WIN32)
-__declspec(dllimport) void blogva(int log_level, const char *format, va_list args);
-#else
-void blogva(int log_level, const char *format, va_list args);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

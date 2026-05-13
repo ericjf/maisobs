@@ -4,6 +4,8 @@
 #include "../multistream-manager.hpp"
 #include "../plugin-support.h"
 
+#include <obs-module.h>
+
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -24,7 +26,7 @@ MultistreamDock::MultistreamDock(QWidget *parent) : QFrame(parent)
 
 	table_ = new QTableWidget(this);
 	table_->setColumnCount(7);
-	table_->setHorizontalHeaderLabels({
+	table_->setHorizontalHeaderLabels(QStringList{
 		QString::fromUtf8(obs_module_text("Col.Enabled")),
 		QString::fromUtf8(obs_module_text("Col.Name")),
 		QString::fromUtf8(obs_module_text("Col.Scene")),
