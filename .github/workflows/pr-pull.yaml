@@ -27,3 +27,12 @@ jobs:
     secrets: inherit
     permissions:
       contents: read
+
+  build-stream-sync:
+    name: Build obs-stream-sync 🧱
+    uses: ./.github/workflows/build-project.yaml
+    with:
+      pluginDir: obs-stream-sync
+    secrets: inherit
+    permissions:
+      contents: read

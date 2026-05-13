@@ -12,9 +12,16 @@ on:
 permissions:
   contents: write
 jobs:
-  check-and-build:
+  check-and-build-scene-multistream:
     if: inputs.job == 'build'
     uses: ./.github/workflows/build-project.yaml
     with:
       pluginDir: obs-scene-multistream
+    secrets: inherit
+
+  check-and-build-stream-sync:
+    if: inputs.job == 'build'
+    uses: ./.github/workflows/build-project.yaml
+    with:
+      pluginDir: obs-stream-sync
     secrets: inherit

@@ -27,11 +27,20 @@ jobs:
     permissions:
       contents: read
 
+  build-stream-sync:
+    name: Build obs-stream-sync 🧱
+    uses: ./.github/workflows/build-project.yaml
+    with:
+      pluginDir: obs-stream-sync
+    secrets: inherit
+    permissions:
+      contents: read
+
   create-release:
     name: Create Release 🛫
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
-    needs: build-scene-multistream
+    needs: [build-scene-multistream, build-stream-sync]
     defaults:
       run:
         shell: bash
