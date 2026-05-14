@@ -4,6 +4,7 @@
 #include "plugin-support.h"
 #include "ui/multistream-dock.hpp"
 #include "multistream-manager.hpp"
+#include "oauth/platform-manager.hpp"
 
 #include <QMainWindow>
 
@@ -35,6 +36,8 @@ bool obs_module_load(void)
 	obs_frontend_add_event_callback(frontend_event_cb, nullptr);
 	/* v0.3: subscribe SCENE_CHANGED for "follow OBS" outputs */
 	MultistreamManager::instance().register_frontend_callback();
+	/* v0.4: restore saved OAuth tokens (Twitch initially) */
+	PlatformManager::instance().try_restore_all();
 	return true;
 }
 

@@ -2,6 +2,7 @@
 #include "destination-dialog.hpp"
 #include "../config.hpp"
 #include "../multistream-manager.hpp"
+#include "../oauth/platform-manager.hpp"
 #include "../plugin-support.h"
 
 #include <obs-module.h>
@@ -25,6 +26,40 @@ MultistreamDock::MultistreamDock(QWidget *parent) : QFrame(parent)
 	auto *title = new QLabel(QString::fromUtf8(obs_module_text("DockTitle")), this);
 	title->setStyleSheet("font-weight: bold;");
 	layout->addWidget(title);
+
+	/* v0.4: OAuth topbar — Twitch connect button + status label */
+	auto *topbar = new QHBoxLayout();
+	btn_twitch_ = new QPushButton(QString::fromUtf8(obs_module_text("Btn.ConnectTwitch")), this);
+	lbl_twitch_status_ = new QLabel(QString::fromUtf8(obs_module_text("Label.NotConnected")), this);
+	topbar->addWidget(btn_twitch_);
+	topbar->addWidget(lbl_twitch_status_, 1);
+	layout->addLayout(topbar);
+
+	connect(btn_twitch_, &QPushButton::clicked, this, [this]() {
+		if (PlatformManager::instance().is_connected("twitch")) {
+			PlatformManager::instance().disconnect_platform("twitch");
+		} else {
+			btn_twitch_->setEnabled(false);
+			PlatformManager::instance().connect_platform("twitch", [this](bool ok, const QString &err) {
+				QMetaObject::invokeMethod(
+					this,
+					[this, ok, err]() {
+						btn_twitch_->setEnabled(true);
+						if (!ok)
+							QMessageBox::critical(
+								this, QString::fromUtf8(obs_module_text("Err.Title")),
+								err);
+					},
+					Qt::QueuedConnection);
+			});
+		}
+	});
+
+	connect(&PlatformManager::instance(), &PlatformManager::connection_changed, this,
+		[this](const QString &platform, bool /*connected*/) {
+			if (platform == "twitch")
+				update_twitch_button();
+		});
 
 	table_ = new QTableWidget(this);
 	table_->setColumnCount(7);
@@ -73,6 +108,7 @@ MultistreamDock::MultistreamDock(QWidget *parent) : QFrame(parent)
 
 	destinations_ = scenemulti::load_destinations();
 	refresh_table();
+	update_twitch_button();
 
 	MultistreamManager::instance().set_status_callback(
 		[this](const std::string &name, bool active, const std::string &error) {
@@ -249,4 +285,17 @@ void MultistreamDock::update_status(const std::string &name, bool active, const 
 		obs_log(LOG_WARNING, "[scene-multistream] '%s' stopped with error: %s", name.c_str(), error.c_str());
 	}
 	refresh_table();
+}
+
+void MultistreamDock::update_twitch_button()
+{
+	bool connected = PlatformManager::instance().is_connected("twitch");
+	if (connected) {
+		btn_twitch_->setText(QString::fromUtf8(obs_module_text("Btn.DisconnectTwitch")));
+		lbl_twitch_status_->setText(QString::fromUtf8(obs_module_text("Label.ConnectedAs"))
+						    .arg(PlatformManager::instance().display_name("twitch")));
+	} else {
+		btn_twitch_->setText(QString::fromUtf8(obs_module_text("Btn.ConnectTwitch")));
+		lbl_twitch_status_->setText(QString::fromUtf8(obs_module_text("Label.NotConnected")));
+	}
 }

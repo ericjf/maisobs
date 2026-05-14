@@ -19,9 +19,3 @@ jobs:
       pluginDir: obs-scene-multistream
     secrets: inherit
 
-  check-and-build-stream-sync:
-    if: inputs.job == 'build'
-    uses: ./.github/workflows/build-project.yaml
-    with:
-      pluginDir: obs-stream-sync
-    secrets: inherit

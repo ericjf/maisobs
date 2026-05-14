@@ -29,3 +29,6 @@ compile_commands.json
 *.env
 .env.local
 secrets/
+
+# Downloaded CI artifacts (local testing only)
+artifacts/

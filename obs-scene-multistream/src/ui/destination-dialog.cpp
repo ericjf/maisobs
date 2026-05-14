@@ -1,4 +1,5 @@
 #include "destination-dialog.hpp"
+#include "../oauth/platform-manager.hpp"
 
 #include <obs.h>
 #include <obs-frontend-api.h>
@@ -34,6 +35,15 @@ DestinationDialog::DestinationDialog(const DestinationConfig &cfg, QWidget *pare
 	check_use_obs_output_->setChecked(cfg.follow_obs_video);
 	form->addRow("", check_use_obs_output_);
 
+	/* v0.4: Source combo — Manual or connected OAuth platform */
+	combo_source_ = new QComboBox(this);
+	combo_source_->addItem(QString::fromUtf8(obs_module_text("Source.Manual")), QVariant("manual"));
+	for (const QString &p : PlatformManager::instance().connected_platforms()) {
+		QString label = QString("%1 (%2)").arg(p.toUpper(), PlatformManager::instance().display_name(p));
+		combo_source_->addItem(label, QVariant(p));
+	}
+	form->addRow(QString::fromUtf8(obs_module_text("Field.Source")), combo_source_);
+
 	edit_url_ = new QLineEdit(QString::fromStdString(cfg.rtmp_url), this);
 	edit_url_->setPlaceholderText("rtmp://... or rtmps://...");
 	form->addRow(QString::fromUtf8(obs_module_text("Field.RTMP")), edit_url_);
@@ -41,6 +51,35 @@ DestinationDialog::DestinationDialog(const DestinationConfig &cfg, QWidget *pare
 	edit_key_ = new QLineEdit(QString::fromStdString(cfg.stream_key), this);
 	edit_key_->setEchoMode(QLineEdit::Password);
 	form->addRow(QString::fromUtf8(obs_module_text("Field.Key")), edit_key_);
+
+	/* v0.4: when user picks a connected platform, fetch URL+key and lock fields */
+	connect(combo_source_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
+		QString src = combo_source_->currentData().toString();
+		bool manual = (src == "manual");
+		edit_url_->setEnabled(manual);
+		edit_key_->setEnabled(manual);
+		if (!manual) {
+			edit_url_->setText(QString::fromUtf8(obs_module_text("Source.Fetching")));
+			edit_key_->setText("");
+			PlatformManager::instance().fetch_rtmp_target(src, [this,
+									    src](const PlatformManager::RTMPTarget &t) {
+				QMetaObject::invokeMethod(
+					this,
+					[this, src, t]() {
+						if (!t.error.isEmpty()) {
+							QMessageBox::warning(
+								this, QString::fromUtf8(obs_module_text("Err.Title")),
+								QString("%1: %2").arg(src, t.error));
+							combo_source_->setCurrentIndex(0);
+							return;
+						}
+						edit_url_->setText(t.rtmp_url);
+						edit_key_->setText(t.stream_key);
+					},
+					Qt::QueuedConnection);
+			});
+		}
+	});
 
 	combo_resolution_ = new QComboBox(this);
 	combo_resolution_->setEditable(true);

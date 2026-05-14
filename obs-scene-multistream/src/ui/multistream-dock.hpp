@@ -5,6 +5,7 @@
 #include <QFrame>
 #include <QTableWidget>
 #include <QPushButton>
+#include <QLabel>
 
 #include <vector>
 
@@ -43,4 +44,10 @@ private:
 	QPushButton *btn_stop_ = nullptr;
 	QPushButton *btn_start_all_ = nullptr;
 	QPushButton *btn_stop_all_ = nullptr;
+
+	/* v0.4: OAuth topbar */
+	QPushButton *btn_twitch_ = nullptr;
+	QLabel *lbl_twitch_status_ = nullptr;
+
+	void update_twitch_button();
 };
