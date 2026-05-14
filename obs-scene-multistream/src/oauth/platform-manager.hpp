@@ -33,6 +33,10 @@ public:
 	/* Called at module load — restores tokens for all providers. */
 	void try_restore_all();
 
+	/* v0.4.1: re-read oauth_apps.json (called after OAuth Settings dialog saves). */
+	void reload_all_credentials();
+	bool has_credentials(const QString &platform_id) const;
+
 signals:
 	void connection_changed(const QString &platform_id, bool connected);
 

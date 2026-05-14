@@ -48,6 +48,9 @@ private:
 	/* v0.4: OAuth topbar */
 	QPushButton *btn_twitch_ = nullptr;
 	QLabel *lbl_twitch_status_ = nullptr;
+	/* v0.4.1: OAuth Settings dialog launcher */
+	QPushButton *btn_oauth_settings_ = nullptr;
 
 	void update_twitch_button();
+	void open_oauth_settings();
 };

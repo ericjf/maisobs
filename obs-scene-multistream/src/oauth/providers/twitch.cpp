@@ -32,8 +32,15 @@ TwitchProvider::TwitchProvider(QObject *parent)
 	  flow_(new OAuthFlow(this)),
 	  http_(new HttpClient(this))
 {
-	/* v0.4: load app credentials from unified oauth_apps.json
-	   Format: { "twitch": { "client_id": "...", "client_secret": "(optional with PKCE)" }, ... } */
+	reload_credentials();
+}
+
+/* v0.4.1: re-read app credentials from oauth_apps.json. Called from ctor and
+   from OAuth Settings dialog after user saves new client_id. */
+void TwitchProvider::reload_credentials()
+{
+	client_id_.clear();
+	client_secret_.clear();
 	char *path = obs_module_config_path("oauth_apps.json");
 	if (path && os_file_exists(path)) {
 		obs_data_t *root = obs_data_create_from_json_file(path);
@@ -49,14 +56,11 @@ TwitchProvider::TwitchProvider(QObject *parent)
 	}
 	bfree(path);
 
-	if (client_id_.isEmpty()) {
-		char *cfg_dir = obs_module_config_path("");
-		obs_log(LOG_WARNING,
-			"[scene-multistream] Twitch client_id not configured. "
-			"Create %s/oauth_apps.json with {\"twitch\":{\"client_id\":\"...\"}}",
-			cfg_dir ? cfg_dir : "<config-dir>");
-		bfree(cfg_dir);
-	}
+	if (client_id_.isEmpty())
+		obs_log(LOG_INFO, "[scene-multistream] Twitch client_id not configured yet");
+	else
+		obs_log(LOG_INFO, "[scene-multistream] Twitch credentials loaded (PKCE %s)",
+			client_secret_.isEmpty() ? "only" : "+ secret");
 }
 
 /* v0.4: GET /helix/streams/key — returns RTMP ingest URL + stream key */

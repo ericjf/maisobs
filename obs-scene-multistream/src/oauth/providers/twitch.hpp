@@ -20,6 +20,11 @@ public:
 	/* Attempt to load saved tokens and validate them. Calls cb(true/false). */
 	void try_restore(std::function<void(bool)> cb);
 
+	/* v0.4.1: re-read oauth_apps.json (called after OAuth Settings dialog Save). */
+	void reload_credentials();
+
+	bool has_credentials() const { return !client_id_.isEmpty(); }
+
 	/* Full OAuth flow — opens browser. */
 	void connect(std::function<void(bool, const QString &error)> cb);
 

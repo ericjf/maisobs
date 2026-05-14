@@ -24,6 +24,19 @@ void PlatformManager::try_restore_all()
 		});
 }
 
+void PlatformManager::reload_all_credentials()
+{
+	if (twitch_)
+		twitch_->reload_credentials();
+}
+
+bool PlatformManager::has_credentials(const QString &platform_id) const
+{
+	if (platform_id == "twitch")
+		return twitch_ && twitch_->has_credentials();
+	return false;
+}
+
 void PlatformManager::connect_platform(const QString &platform_id, std::function<void(bool, const QString &)> cb)
 {
 	if (platform_id == "twitch") {

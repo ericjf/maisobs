@@ -1,5 +1,6 @@
 #include "multistream-dock.hpp"
 #include "destination-dialog.hpp"
+#include "oauth-settings-dialog.hpp"
 #include "../config.hpp"
 #include "../multistream-manager.hpp"
 #include "../oauth/platform-manager.hpp"
@@ -27,32 +28,45 @@ MultistreamDock::MultistreamDock(QWidget *parent) : QFrame(parent)
 	title->setStyleSheet("font-weight: bold;");
 	layout->addWidget(title);
 
-	/* v0.4: OAuth topbar — Twitch connect button + status label */
+	/* v0.4: OAuth topbar — settings + Twitch connect + status label */
 	auto *topbar = new QHBoxLayout();
+	btn_oauth_settings_ = new QPushButton("⚙", this);
+	btn_oauth_settings_->setToolTip(QString::fromUtf8(obs_module_text("Btn.OAuthSettings")));
+	btn_oauth_settings_->setFixedWidth(32);
 	btn_twitch_ = new QPushButton(QString::fromUtf8(obs_module_text("Btn.ConnectTwitch")), this);
 	lbl_twitch_status_ = new QLabel(QString::fromUtf8(obs_module_text("Label.NotConnected")), this);
+	topbar->addWidget(btn_oauth_settings_);
 	topbar->addWidget(btn_twitch_);
 	topbar->addWidget(lbl_twitch_status_, 1);
 	layout->addLayout(topbar);
 
+	connect(btn_oauth_settings_, &QPushButton::clicked, this, &MultistreamDock::open_oauth_settings);
+
 	connect(btn_twitch_, &QPushButton::clicked, this, [this]() {
 		if (PlatformManager::instance().is_connected("twitch")) {
 			PlatformManager::instance().disconnect_platform("twitch");
-		} else {
-			btn_twitch_->setEnabled(false);
-			PlatformManager::instance().connect_platform("twitch", [this](bool ok, const QString &err) {
-				QMetaObject::invokeMethod(
-					this,
-					[this, ok, err]() {
-						btn_twitch_->setEnabled(true);
-						if (!ok)
-							QMessageBox::critical(
-								this, QString::fromUtf8(obs_module_text("Err.Title")),
-								err);
-					},
-					Qt::QueuedConnection);
-			});
+			return;
 		}
+		/* v0.4.1: if no client_id configured, open Settings dialog first */
+		if (!PlatformManager::instance().has_credentials("twitch")) {
+			QMessageBox::information(this, QString::fromUtf8(obs_module_text("Err.Title")),
+						 QString::fromUtf8(obs_module_text("OAuth.NoCredentialsWarning")));
+			open_oauth_settings();
+			if (!PlatformManager::instance().has_credentials("twitch"))
+				return;
+		}
+		btn_twitch_->setEnabled(false);
+		PlatformManager::instance().connect_platform("twitch", [this](bool ok, const QString &err) {
+			QMetaObject::invokeMethod(
+				this,
+				[this, ok, err]() {
+					btn_twitch_->setEnabled(true);
+					if (!ok)
+						QMessageBox::critical(
+							this, QString::fromUtf8(obs_module_text("Err.Title")), err);
+				},
+				Qt::QueuedConnection);
+		});
 	});
 
 	connect(&PlatformManager::instance(), &PlatformManager::connection_changed, this,
@@ -285,6 +299,14 @@ void MultistreamDock::update_status(const std::string &name, bool active, const 
 		obs_log(LOG_WARNING, "[scene-multistream] '%s' stopped with error: %s", name.c_str(), error.c_str());
 	}
 	refresh_table();
+}
+
+void MultistreamDock::open_oauth_settings()
+{
+	OAuthSettingsDialog dlg(this);
+	dlg.exec();
+	/* PlatformManager already reloaded inside dlg.on_accept(); refresh UI label state */
+	update_twitch_button();
 }
 
 void MultistreamDock::update_twitch_button()

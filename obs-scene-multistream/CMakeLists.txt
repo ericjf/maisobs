@@ -49,6 +49,9 @@ target_sources(
     src/ui/multistream-dock.hpp
     src/ui/destination-dialog.cpp
     src/ui/destination-dialog.hpp
+    # v0.4.1: OAuth settings dialog
+    src/ui/oauth-settings-dialog.cpp
+    src/ui/oauth-settings-dialog.hpp
     # v0.4: OAuth + HTTP
     src/api/http-client.cpp
     src/api/http-client.hpp
