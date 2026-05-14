@@ -35,11 +35,14 @@ bool obs_module_load(void)
 				    dock);
 
 	obs_frontend_add_event_callback(frontend_event_cb, nullptr);
+	/* v0.3: subscribe SCENE_CHANGED for "follow OBS" outputs */
+	MultistreamManager::instance().register_frontend_callback();
 	return true;
 }
 
 void obs_module_unload(void)
 {
+	MultistreamManager::instance().unregister_frontend_callback();
 	obs_frontend_remove_event_callback(frontend_event_cb, nullptr);
 	MultistreamManager::instance().stop_all();
 	obs_log(LOG_INFO, "[scene-multistream] unloaded");

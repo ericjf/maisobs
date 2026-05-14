@@ -21,10 +21,18 @@ DestinationDialog::DestinationDialog(const DestinationConfig &cfg, QWidget *pare
 
 	combo_scene_ = new QComboBox(this);
 	populate_scenes();
-	int idx = combo_scene_->findText(QString::fromStdString(cfg.scene_name));
-	if (idx >= 0)
-		combo_scene_->setCurrentIndex(idx);
+	if (cfg.follow_obs_scene) {
+		combo_scene_->setCurrentIndex(0); /* "(Follow OBS)" — index 0 */
+	} else {
+		int idx = combo_scene_->findText(QString::fromStdString(cfg.scene_name));
+		if (idx >= 0)
+			combo_scene_->setCurrentIndex(idx);
+	}
 	form->addRow(QString::fromUtf8(obs_module_text("Field.Scene")), combo_scene_);
+
+	check_use_obs_output_ = new QCheckBox(QString::fromUtf8(obs_module_text("Field.UseOBSOutput")), this);
+	check_use_obs_output_->setChecked(cfg.follow_obs_video);
+	form->addRow("", check_use_obs_output_);
 
 	edit_url_ = new QLineEdit(QString::fromStdString(cfg.rtmp_url), this);
 	edit_url_->setPlaceholderText("rtmp://... or rtmps://...");
@@ -92,13 +100,15 @@ DestinationDialog::DestinationDialog(const DestinationConfig &cfg, QWidget *pare
 void DestinationDialog::populate_scenes()
 {
 	combo_scene_->clear();
+	/* v0.3: "(Follow OBS)" is always the first option (sentinel: empty userData) */
+	combo_scene_->addItem(QString::fromUtf8(obs_module_text("Scene.FollowOBS")), QVariant(QString()));
 	struct obs_frontend_source_list scenes = {};
 	obs_frontend_get_scenes(&scenes);
 	for (size_t i = 0; i < scenes.sources.num; i++) {
 		obs_source_t *s = scenes.sources.array[i];
 		const char *n = obs_source_get_name(s);
 		if (n)
-			combo_scene_->addItem(QString::fromUtf8(n));
+			combo_scene_->addItem(QString::fromUtf8(n), QVariant(QString::fromUtf8(n)));
 	}
 	obs_frontend_source_list_free(&scenes);
 }
@@ -141,7 +151,11 @@ void DestinationDialog::on_accept()
 {
 	result_ = initial_;
 	result_.name = edit_name_->text().trimmed().toStdString();
-	result_.scene_name = combo_scene_->currentText().toStdString();
+	/* v0.3: index 0 = "(Follow OBS)" — sentinel via empty userData QVariant */
+	QString scene_data = combo_scene_->currentData().toString();
+	result_.follow_obs_scene = scene_data.isEmpty();
+	result_.scene_name = result_.follow_obs_scene ? std::string() : scene_data.toStdString();
+	result_.follow_obs_video = check_use_obs_output_->isChecked();
 	result_.rtmp_url = edit_url_->text().trimmed().toStdString();
 	result_.stream_key = edit_key_->text().toStdString();
 	result_.video_encoder = combo_video_encoder_->currentData().toString().toStdString();
@@ -164,7 +178,8 @@ void DestinationDialog::on_accept()
 		QMessageBox::warning(this, "", QString::fromUtf8(obs_module_text("Err.NameEmpty")));
 		return;
 	}
-	if (result_.scene_name.empty()) {
+	/* v0.3: scene_name may be empty when follow_obs_scene=true */
+	if (!result_.follow_obs_scene && result_.scene_name.empty()) {
 		QMessageBox::warning(this, "", QString::fromUtf8(obs_module_text("Err.SceneEmpty")));
 		return;
 	}

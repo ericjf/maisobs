@@ -29,6 +29,7 @@ private:
 
 	QLineEdit *edit_name_ = nullptr;
 	QComboBox *combo_scene_ = nullptr;
+	QCheckBox *check_use_obs_output_ = nullptr; /* v0.3 */
 	QLineEdit *edit_url_ = nullptr;
 	QLineEdit *edit_key_ = nullptr;
 	QComboBox *combo_video_encoder_ = nullptr;

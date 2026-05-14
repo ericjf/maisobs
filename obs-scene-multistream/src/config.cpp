@@ -123,6 +123,21 @@ static DestinationConfig from_obs_data(obs_data_t *d)
 		c.audio_track = (uint32_t)obs_data_get_int(d, "audio_track");
 	if (obs_data_has_user_value(d, "enabled"))
 		c.enabled = obs_data_get_bool(d, "enabled");
+
+	/* v0.3 follow flags — backwards compat:
+	   - if flag present, use it
+	   - else: if old config had explicit scene_name → follow_obs_scene=false
+	           if old config had width/height/bitrate → follow_obs_video=false */
+	if (obs_data_has_user_value(d, "follow_obs_scene"))
+		c.follow_obs_scene = obs_data_get_bool(d, "follow_obs_scene");
+	else
+		c.follow_obs_scene = c.scene_name.empty();
+
+	if (obs_data_has_user_value(d, "follow_obs_video"))
+		c.follow_obs_video = obs_data_get_bool(d, "follow_obs_video");
+	else
+		c.follow_obs_video = !(obs_data_has_user_value(d, "width") ||
+				       obs_data_has_user_value(d, "video_bitrate_kbps"));
 	return c;
 }
 
@@ -131,6 +146,8 @@ static obs_data_t *to_obs_data(const DestinationConfig &c)
 	obs_data_t *d = obs_data_create();
 	obs_data_set_string(d, "name", c.name.c_str());
 	obs_data_set_string(d, "scene_name", c.scene_name.c_str());
+	obs_data_set_bool(d, "follow_obs_scene", c.follow_obs_scene);
+	obs_data_set_bool(d, "follow_obs_video", c.follow_obs_video);
 	obs_data_set_string(d, "rtmp_url", c.rtmp_url.c_str());
 	obs_data_set_string(d, "stream_key", dpapi_encrypt(c.stream_key).c_str());
 	obs_data_set_string(d, "video_encoder", c.video_encoder.c_str());

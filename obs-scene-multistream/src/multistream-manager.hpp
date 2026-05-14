@@ -2,6 +2,7 @@
 
 #include "destination.hpp"
 #include <obs.h>
+#include <obs-frontend-api.h>
 
 #include <map>
 #include <string>
@@ -43,6 +44,17 @@ public:
 
 	void set_status_callback(StatusCallback cb);
 
+	/* v0.3: hot-swap scene on running output (no stop/start) */
+	bool set_scene_for(const std::string &dest_name, const std::string &scene_name, bool follow_obs_scene);
+
+	/* v0.3: called on OBS frontend SCENE_CHANGED — propagates new program scene
+	   to all active outputs with follow_obs_scene=true */
+	void on_program_scene_changed();
+
+	/* v0.3: registered once in obs_module_load */
+	void register_frontend_callback();
+	void unregister_frontend_callback();
+
 private:
 	MultistreamManager() = default;
 	~MultistreamManager();
@@ -53,6 +65,7 @@ private:
 
 	static void on_output_start(void *data, calldata_t *cd);
 	static void on_output_stop(void *data, calldata_t *cd);
+	static void on_frontend_event(enum obs_frontend_event evt, void *data);
 
 	mutable std::mutex mtx_;
 	std::map<std::string, RuntimeOutput> outputs_;

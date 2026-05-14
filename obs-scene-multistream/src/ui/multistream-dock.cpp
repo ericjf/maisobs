@@ -5,6 +5,7 @@
 #include "../plugin-support.h"
 
 #include <obs-module.h>
+#include <obs-frontend-api.h>
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -12,6 +13,7 @@
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QLabel>
+#include <QComboBox>
 
 MultistreamDock::MultistreamDock(QWidget *parent) : QFrame(parent)
 {
@@ -101,9 +103,49 @@ void MultistreamDock::refresh_table()
 		const auto &d = destinations_[i];
 		table_->setItem(i, 0, new QTableWidgetItem(d.enabled ? "✓" : ""));
 		table_->setItem(i, 1, new QTableWidgetItem(QString::fromStdString(d.name)));
-		table_->setItem(i, 2, new QTableWidgetItem(QString::fromStdString(d.scene_name)));
-		table_->setItem(i, 3, new QTableWidgetItem(QString("%1x%2 @ %3").arg(d.width).arg(d.height).arg(d.fps_num / d.fps_den)));
-		table_->setItem(i, 4, new QTableWidgetItem(QString("%1 kbps").arg(d.video_bitrate_kbps)));
+
+		/* v0.3: scene column is an inline QComboBox — supports hot-swap mid-stream */
+		auto *combo = new QComboBox(table_);
+		combo->addItem(QString::fromUtf8(obs_module_text("Scene.FollowOBS")), QVariant(QString()));
+		struct obs_frontend_source_list scenes = {};
+		obs_frontend_get_scenes(&scenes);
+		for (size_t k = 0; k < scenes.sources.num; k++) {
+			obs_source_t *s = scenes.sources.array[k];
+			const char *n = obs_source_get_name(s);
+			if (n)
+				combo->addItem(QString::fromUtf8(n), QVariant(QString::fromUtf8(n)));
+		}
+		obs_frontend_source_list_free(&scenes);
+		if (d.follow_obs_scene) {
+			combo->setCurrentIndex(0);
+		} else {
+			int idx = combo->findData(QVariant(QString::fromStdString(d.scene_name)));
+			combo->setCurrentIndex(idx > 0 ? idx : 0);
+		}
+		const int row_idx = i;
+		QObject::connect(combo,
+				 QOverload<int>::of(&QComboBox::currentIndexChanged),
+				 this, [this, combo, row_idx](int) {
+					 if (row_idx < 0 || row_idx >= (int)destinations_.size())
+						 return;
+					 QString data = combo->currentData().toString();
+					 bool follow = data.isEmpty();
+					 destinations_[row_idx].follow_obs_scene = follow;
+					 destinations_[row_idx].scene_name = follow ? std::string()
+										    : data.toStdString();
+					 save();
+					 MultistreamManager::instance().set_scene_for(
+						 destinations_[row_idx].name,
+						 destinations_[row_idx].scene_name, follow);
+				 });
+		table_->setCellWidget(i, 2, combo);
+
+		QString res = d.follow_obs_video ? QString::fromUtf8(obs_module_text("OBS.Default"))
+						 : QString("%1x%2 @ %3").arg(d.width).arg(d.height).arg(d.fps_num / d.fps_den);
+		QString br = d.follow_obs_video ? QString::fromUtf8(obs_module_text("OBS.Default"))
+						: QString("%1 kbps").arg(d.video_bitrate_kbps);
+		table_->setItem(i, 3, new QTableWidgetItem(res));
+		table_->setItem(i, 4, new QTableWidgetItem(br));
 		table_->setItem(i, 5, new QTableWidgetItem(QString::fromStdString(d.rtmp_url)));
 		bool active = MultistreamManager::instance().is_active(d.name);
 		table_->setItem(i, 6, new QTableWidgetItem(active ? QString::fromUtf8(obs_module_text("Status.Live"))
