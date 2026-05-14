@@ -407,8 +407,8 @@ void MultistreamManager::on_output_stop(void *data, calldata_t *cd)
 		cb(dest_name, false, err);
 
 	if (should_reconnect) {
-		obs_log(LOG_INFO, "[scene-multistream] '%s' reconnect attempt %d/%d in %dms",
-			dest_name.c_str(), attempt, RuntimeOutput::MAX_RECONNECT, delay_ms);
+		obs_log(LOG_INFO, "[scene-multistream] '%s' reconnect attempt %d/%d in %dms", dest_name.c_str(),
+			attempt, RuntimeOutput::MAX_RECONNECT, delay_ms);
 		/* Reconnect on a background thread after delay.
 		   MultistreamManager lifetime >= OBS session, safe to capture self. */
 		std::thread([self, reconnect_cfg, dest_name, delay_ms, attempt]() {
@@ -451,8 +451,7 @@ bool MultistreamManager::set_scene_for(const std::string &dest_name, const std::
 	obs_source_t *scene = follow_obs_scene ? obs_frontend_get_current_scene()
 					       : obs_get_source_by_name(scene_name.c_str());
 	if (!scene) {
-		obs_log(LOG_WARNING, "[scene-multistream] set_scene_for '%s': scene not found",
-			dest_name.c_str());
+		obs_log(LOG_WARNING, "[scene-multistream] set_scene_for '%s': scene not found", dest_name.c_str());
 		return false;
 	}
 

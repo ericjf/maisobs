@@ -5,9 +5,9 @@
 
 struct DestinationConfig {
 	std::string name;
-	std::string scene_name;             /* ignored if follow_obs_scene */
-	bool follow_obs_scene = true;       /* v0.3: default = follow program scene */
-	bool follow_obs_video = true;       /* v0.3: default = follow OBS output settings */
+	std::string scene_name;       /* ignored if follow_obs_scene */
+	bool follow_obs_scene = true; /* v0.3: default = follow program scene */
+	bool follow_obs_video = true; /* v0.3: default = follow OBS output settings */
 	std::string rtmp_url;
 	std::string stream_key;
 	std::string video_encoder = "obs_x264";

@@ -30,9 +30,7 @@ bool obs_module_load(void)
 	auto *dock = new MultistreamDock(static_cast<QWidget *>(obs_frontend_get_main_window()));
 	dock->setWindowTitle(QString::fromUtf8(obs_module_text("DockTitle")));
 
-	obs_frontend_add_dock_by_id("obs-scene-multistream-dock",
-				    obs_module_text("DockTitle"),
-				    dock);
+	obs_frontend_add_dock_by_id("obs-scene-multistream-dock", obs_module_text("DockTitle"), dock);
 
 	obs_frontend_add_event_callback(frontend_event_cb, nullptr);
 	/* v0.3: subscribe SCENE_CHANGED for "follow OBS" outputs */

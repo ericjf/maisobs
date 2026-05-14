@@ -20,19 +20,18 @@ static std::string dpapi_encrypt(const std::string &plain)
 		return {};
 	DATA_BLOB in_blob{(DWORD)plain.size(), (BYTE *)plain.c_str()};
 	DATA_BLOB out_blob{};
-	if (!CryptProtectData(&in_blob, L"obs-scene-multistream", nullptr, nullptr, nullptr,
-			      0, &out_blob)) {
+	if (!CryptProtectData(&in_blob, L"obs-scene-multistream", nullptr, nullptr, nullptr, 0, &out_blob)) {
 		obs_log(LOG_WARNING, "[scene-multistream] DPAPI encrypt failed (0x%lx) — storing plain",
 			(unsigned long)GetLastError());
 		return plain;
 	}
 	/* encode to base64 for JSON storage */
 	DWORD b64_len = 0;
-	CryptBinaryToStringA(out_blob.pbData, out_blob.cbData, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
-			     nullptr, &b64_len);
+	CryptBinaryToStringA(out_blob.pbData, out_blob.cbData, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, nullptr,
+			     &b64_len);
 	std::string b64(b64_len, '\0');
-	CryptBinaryToStringA(out_blob.pbData, out_blob.cbData, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
-			     b64.data(), &b64_len);
+	CryptBinaryToStringA(out_blob.pbData, out_blob.cbData, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, b64.data(),
+			     &b64_len);
 	/* b64_len includes null terminator — trim it */
 	if (!b64.empty() && b64.back() == '\0')
 		b64.pop_back();
@@ -45,18 +44,17 @@ static std::string dpapi_decrypt(const std::string &b64)
 	if (b64.empty())
 		return {};
 	DWORD bin_len = 0;
-	if (!CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(), CRYPT_STRING_BASE64, nullptr, &bin_len,
-				  nullptr, nullptr)) {
+	if (!CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(), CRYPT_STRING_BASE64, nullptr, &bin_len, nullptr,
+				  nullptr)) {
 		/* not base64 — probably plain text from old version, return as-is */
 		return b64;
 	}
 	std::vector<BYTE> bin(bin_len);
-	CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(), CRYPT_STRING_BASE64, bin.data(), &bin_len,
-			     nullptr, nullptr);
+	CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(), CRYPT_STRING_BASE64, bin.data(), &bin_len, nullptr,
+			     nullptr);
 	DATA_BLOB in_blob{bin_len, bin.data()};
 	DATA_BLOB out_blob{};
-	if (!CryptProtectData(&in_blob, nullptr, nullptr, nullptr, nullptr, 0,
-			      &out_blob)) {
+	if (!CryptProtectData(&in_blob, nullptr, nullptr, nullptr, nullptr, 0, &out_blob)) {
 		obs_log(LOG_WARNING, "[scene-multistream] DPAPI decrypt failed (0x%lx) — returning raw",
 			(unsigned long)GetLastError());
 		return b64;
@@ -136,8 +134,8 @@ static DestinationConfig from_obs_data(obs_data_t *d)
 	if (obs_data_has_user_value(d, "follow_obs_video"))
 		c.follow_obs_video = obs_data_get_bool(d, "follow_obs_video");
 	else
-		c.follow_obs_video = !(obs_data_has_user_value(d, "width") ||
-				       obs_data_has_user_value(d, "video_bitrate_kbps"));
+		c.follow_obs_video =
+			!(obs_data_has_user_value(d, "width") || obs_data_has_user_value(d, "video_bitrate_kbps"));
 	return c;
 }
 

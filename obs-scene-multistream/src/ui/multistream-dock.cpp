@@ -76,9 +76,9 @@ MultistreamDock::MultistreamDock(QWidget *parent) : QFrame(parent)
 
 	MultistreamManager::instance().set_status_callback(
 		[this](const std::string &name, bool active, const std::string &error) {
-			QMetaObject::invokeMethod(this,
-						  [this, name, active, error]() { update_status(name, active, error); },
-						  Qt::QueuedConnection);
+			QMetaObject::invokeMethod(
+				this, [this, name, active, error]() { update_status(name, active, error); },
+				Qt::QueuedConnection);
 		});
 }
 
@@ -123,33 +123,32 @@ void MultistreamDock::refresh_table()
 			combo->setCurrentIndex(idx > 0 ? idx : 0);
 		}
 		const int row_idx = i;
-		QObject::connect(combo,
-				 QOverload<int>::of(&QComboBox::currentIndexChanged),
-				 this, [this, combo, row_idx](int) {
-					 if (row_idx < 0 || row_idx >= (int)destinations_.size())
-						 return;
-					 QString data = combo->currentData().toString();
-					 bool follow = data.isEmpty();
-					 destinations_[row_idx].follow_obs_scene = follow;
-					 destinations_[row_idx].scene_name = follow ? std::string()
-										    : data.toStdString();
-					 save();
-					 MultistreamManager::instance().set_scene_for(
-						 destinations_[row_idx].name,
-						 destinations_[row_idx].scene_name, follow);
-				 });
+		QObject::connect(
+			combo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this, combo, row_idx](int) {
+				if (row_idx < 0 || row_idx >= (int)destinations_.size())
+					return;
+				QString data = combo->currentData().toString();
+				bool follow = data.isEmpty();
+				destinations_[row_idx].follow_obs_scene = follow;
+				destinations_[row_idx].scene_name = follow ? std::string() : data.toStdString();
+				save();
+				MultistreamManager::instance().set_scene_for(destinations_[row_idx].name,
+									     destinations_[row_idx].scene_name, follow);
+			});
 		table_->setCellWidget(i, 2, combo);
 
-		QString res = d.follow_obs_video ? QString::fromUtf8(obs_module_text("OBS.Default"))
-						 : QString("%1x%2 @ %3").arg(d.width).arg(d.height).arg(d.fps_num / d.fps_den);
+		QString res = d.follow_obs_video
+				      ? QString::fromUtf8(obs_module_text("OBS.Default"))
+				      : QString("%1x%2 @ %3").arg(d.width).arg(d.height).arg(d.fps_num / d.fps_den);
 		QString br = d.follow_obs_video ? QString::fromUtf8(obs_module_text("OBS.Default"))
 						: QString("%1 kbps").arg(d.video_bitrate_kbps);
 		table_->setItem(i, 3, new QTableWidgetItem(res));
 		table_->setItem(i, 4, new QTableWidgetItem(br));
 		table_->setItem(i, 5, new QTableWidgetItem(QString::fromStdString(d.rtmp_url)));
 		bool active = MultistreamManager::instance().is_active(d.name);
-		table_->setItem(i, 6, new QTableWidgetItem(active ? QString::fromUtf8(obs_module_text("Status.Live"))
-								   : QString::fromUtf8(obs_module_text("Status.Idle"))));
+		table_->setItem(i, 6,
+				new QTableWidgetItem(active ? QString::fromUtf8(obs_module_text("Status.Live"))
+							    : QString::fromUtf8(obs_module_text("Status.Idle"))));
 	}
 }
 
